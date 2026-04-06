@@ -8,6 +8,7 @@ type SavedCalculation = {
   name: string;
   notes: string;
   inputs: {
+    peptideLabel?: string;
     syringeLabel: string;
     vialLabel: string;
     waterLabel: string;
@@ -54,10 +55,12 @@ export default function CalculatorClient() {
   const [customWater, setCustomWater] = useState("");
   const [customDose, setCustomDose] = useState("");
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [saveName, setSaveName] = useState("");
-  const [saveNotes, setSaveNotes] = useState("");
+  const [saveEmail, setSaveEmail] = useState("");
+  const [savePeptide, setSavePeptide] = useState("");
+  const [saveCompany, setSaveCompany] = useState("");
   const [saveError, setSaveError] = useState("");
-  const [saveSuccess, setSaveSuccess] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [targetUnits, setTargetUnits] = useState<string>("");
   const [selectedExample, setSelectedExample] = useState<
     "retatrutide" | "tesamorelin" | "bpc" | null
@@ -388,22 +391,50 @@ export default function CalculatorClient() {
 
   const handleOpenSaveModal = useCallback(() => {
     setSaveError("");
-    setSaveSuccess("");
+    setSaveSuccess(false);
+    setSavePeptide("");
     setIsSaveModalOpen(true);
   }, []);
 
   const handleCloseSaveModal = useCallback(() => {
     setIsSaveModalOpen(false);
     setSaveError("");
-    setSaveSuccess("");
+    setSaveSuccess(false);
+    setIsSaving(false);
+    setSaveEmail("");
+    setSavePeptide("");
+    setSaveCompany("");
   }, []);
 
-  const handleSaveCalculation = useCallback(() => {
+  const handleSaveCalculation = useCallback(async () => {
     if (!computed || "error" in computed) {
       setSaveError("Enter valid values before saving.");
-      setSaveSuccess("");
+      setSaveSuccess(false);
       return;
     }
+
+    const email = saveEmail.trim();
+    const peptide = savePeptide.trim();
+
+    if (!email) {
+      setSaveError("Email is required.");
+      setSaveSuccess(false);
+      return;
+    }
+
+    if (!peptide) {
+      setSaveError("Peptide name is required.");
+      setSaveSuccess(false);
+      return;
+    }
+
+    if (isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError("");
+    setSaveSuccess(false);
 
     const doseLabel =
       doseUnit === "mg"
@@ -412,25 +443,54 @@ export default function CalculatorClient() {
           })} mg`
         : `${computed.doseMcg.toLocaleString()} mcg`;
 
-    const nextEntry: SavedCalculation = {
-      id: `${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      name: saveName.trim() || "Saved calculation",
-      notes: saveNotes.trim(),
-      inputs: {
-        syringeLabel: selectedSyringe.label.replace("ml", "mL"),
-        vialLabel: selectedVialLabel,
-        waterLabel: selectedWaterLabel,
-        doseLabel,
-      },
-      result: {
-        units: computed.unitsRounded,
-        concentrationMcgPerMl: computed.concentrationMcgPerMl,
-        doseVolumeMl: computed.doseVolumeMl,
-      },
+    const calculationForEmail = {
+      peptideLabel: peptide,
+      units: computed.unitsRounded,
+      syringeLabel: selectedSyringe.label.replace("ml", "mL"),
+      doseLabel,
+      vialLabel: selectedVialLabel,
+      waterLabel: selectedWaterLabel,
+      concentrationMcgPerMl: computed.concentrationMcgPerMl,
+      doseVolumeMl: computed.doseVolumeMl,
     };
 
     try {
+      const response = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          company: saveCompany,
+          calculation: calculationForEmail,
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result?.success) {
+        setSaveError(result?.error || "Could not save right now.");
+        setSaveSuccess(false);
+        return;
+      }
+
+      const nextEntry: SavedCalculation = {
+        id: `${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        name: `${peptide} · ${selectedVialLabel} vial · ${selectedWaterLabel} water`,
+        notes: "",
+        inputs: {
+          peptideLabel: peptide,
+          syringeLabel: selectedSyringe.label.replace("ml", "mL"),
+          vialLabel: selectedVialLabel,
+          waterLabel: selectedWaterLabel,
+          doseLabel,
+        },
+        result: {
+          units: computed.unitsRounded,
+          concentrationMcgPerMl: computed.concentrationMcgPerMl,
+          doseVolumeMl: computed.doseVolumeMl,
+        },
+      };
+
       const raw =
         typeof window !== "undefined"
           ? window.localStorage.getItem(SAVED_CALCULATIONS_STORAGE_KEY)
@@ -441,19 +501,24 @@ export default function CalculatorClient() {
         SAVED_CALCULATIONS_STORAGE_KEY,
         JSON.stringify(updated),
       );
-      setSaveSuccess("Saved to this browser.");
+      setSaveSuccess(true);
       setSaveError("");
-      setSaveName("");
-      setSaveNotes("");
+      setSaveEmail("");
+      setSavePeptide("");
+      setSaveCompany("");
     } catch {
       setSaveError("Could not save right now. Please try again.");
-      setSaveSuccess("");
+      setSaveSuccess(false);
+    } finally {
+      setIsSaving(false);
     }
   }, [
     computed,
     doseUnit,
-    saveName,
-    saveNotes,
+    isSaving,
+    saveCompany,
+    saveEmail,
+    savePeptide,
     selectedSyringe.label,
     selectedVialLabel,
     selectedWaterLabel,
@@ -1147,10 +1212,15 @@ export default function CalculatorClient() {
                   id="save-calculation-title"
                   className="text-lg font-semibold text-slate-950"
                 >
-                  Save calculation
+                  Free Peptide Calculator
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
-                  Saved locally in this browser.
+                  We&apos;ll email this saved calculation to you from{" "}
+                  <span className="font-semibold text-slate-900">
+                    calculations@freepepcalc.com
+                  </span>
+                  . If you don&apos;t receive an email, check spam and ensure
+                  this sender is trusted.
                 </p>
               </div>
               <button
@@ -1163,59 +1233,93 @@ export default function CalculatorClient() {
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
-                  Name
-                </span>
-                <input
-                  type="text"
-                  value={saveName}
-                  onChange={(event) => setSaveName(event.target.value)}
-                  placeholder="Morning dose"
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-200"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
-                  Notes (optional)
-                </span>
-                <textarea
-                  value={saveNotes}
-                  onChange={(event) => setSaveNotes(event.target.value)}
-                  placeholder="Any context for this setup"
-                  rows={3}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-200"
-                />
-              </label>
-
-              {saveError ? (
-                <p className="text-xs font-medium text-rose-600">{saveError}</p>
-              ) : null}
-              {saveSuccess ? (
-                <p className="text-xs font-medium text-emerald-700">
-                  {saveSuccess}
+            {saveSuccess ? (
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-sm font-semibold text-emerald-800">
+                  Calculation emailed.
                 </p>
-              ) : null}
-            </div>
+                <p className="mt-1 text-xs text-emerald-700">
+                  Check your inbox for your saved calculation. It is also saved
+                  in this browser.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCloseSaveModal}
+                  className="mt-3 inline-flex h-9 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="mt-4 space-y-3">
+                  <label htmlFor="calc-save-peptide" className="sr-only">
+                    Peptide name
+                  </label>
+                  <input
+                    id="calc-save-peptide"
+                    type="text"
+                    value={savePeptide}
+                    onChange={(event) => setSavePeptide(event.target.value)}
+                    placeholder="What peptide is this for?"
+                    maxLength={80}
+                    required
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-200"
+                  />
 
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleCloseSaveModal}
-                className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveCalculation}
-                className="inline-flex h-9 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                Save
-              </button>
-            </div>
+                  <label htmlFor="calc-save-email" className="sr-only">
+                    Email address
+                  </label>
+                  <input
+                    id="calc-save-email"
+                    type="email"
+                    value={saveEmail}
+                    onChange={(event) => setSaveEmail(event.target.value)}
+                    placeholder="Enter your email"
+                    required
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-200"
+                  />
+
+                  <input
+                    type="text"
+                    value={saveCompany}
+                    onChange={(event) => setSaveCompany(event.target.value)}
+                    className="hidden"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                  />
+
+                  {saveError ? (
+                    <p className="text-xs font-medium text-rose-600">
+                      {saveError}
+                    </p>
+                  ) : null}
+                  <p className="text-xs text-slate-500">
+                    We&apos;ll send your saved calculation and occasional
+                    product updates. We will never sell your information.
+                  </p>
+                </div>
+
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseSaveModal}
+                    className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveCalculation}
+                    disabled={isSaving}
+                    className="inline-flex h-9 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-70"
+                  >
+                    {isSaving ? "Sending..." : "Email my calculation"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}
