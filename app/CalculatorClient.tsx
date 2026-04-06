@@ -388,13 +388,25 @@ export default function CalculatorClient() {
           })} mg`
         : `${computed.doseMcg.toLocaleString()} mcg`
       : null;
+  const selectedExamplePeptideName = useMemo(() => {
+    switch (selectedExample) {
+      case "retatrutide":
+        return "Retatrutide";
+      case "tesamorelin":
+        return "Tesamorelin";
+      case "bpc":
+        return "BPC 157";
+      default:
+        return "";
+    }
+  }, [selectedExample]);
 
   const handleOpenSaveModal = useCallback(() => {
     setSaveError("");
     setSaveSuccess(false);
-    setSavePeptide("");
+    setSavePeptide(selectedExamplePeptideName);
     setIsSaveModalOpen(true);
-  }, []);
+  }, [selectedExamplePeptideName]);
 
   const handleCloseSaveModal = useCallback(() => {
     setIsSaveModalOpen(false);
