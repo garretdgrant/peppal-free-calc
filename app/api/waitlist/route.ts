@@ -9,8 +9,6 @@ import {
 import { isSpamHoneypot } from "@/lib/spam";
 import { isValidEmail } from "@/lib/validations";
 
-const DEFAULT_WAITLIST_SEGMENT_NAME = "peppal";
-const DEFAULT_WAITLIST_TOPIC_NAME = "PepPal Updates";
 const RESEND_RATE_LIMIT_RETRY_COUNT = 3;
 const RESEND_RATE_LIMIT_BASE_DELAY_MS = 250;
 
@@ -309,9 +307,13 @@ const resolveWaitlistSegmentId = async (resend: Resend) => {
     cachedId: cachedWaitlistSegmentId,
     pendingPromise: waitlistSegmentIdPromise,
     load: async () => {
-      const configuredName =
-        process.env.RESEND_WAITLIST_SEGMENT_NAME?.trim() ??
-        DEFAULT_WAITLIST_SEGMENT_NAME;
+      const configuredName = process.env.RESEND_WAITLIST_SEGMENT_NAME?.trim();
+
+      if (!configuredName) {
+        throw new Error(
+          "RESEND_WAITLIST_SEGMENT_NAME is required but not configured.",
+        );
+      }
 
       const data = await callResend(
         () => resend.segments.list(),
@@ -342,9 +344,13 @@ const resolveWaitlistTopicId = async (resend: Resend) => {
     cachedId: cachedWaitlistTopicId,
     pendingPromise: waitlistTopicIdPromise,
     load: async () => {
-      const configuredName =
-        process.env.RESEND_WAITLIST_TOPIC_NAME?.trim() ??
-        DEFAULT_WAITLIST_TOPIC_NAME;
+      const configuredName = process.env.RESEND_WAITLIST_TOPIC_NAME?.trim();
+
+      if (!configuredName) {
+        throw new Error(
+          "RESEND_WAITLIST_TOPIC_NAME is required but not configured.",
+        );
+      }
 
       const data = await callResend(
         () => resend.topics.list(),
@@ -478,12 +484,15 @@ const ensureWaitlistContact = async (
 export async function POST(req: NextRequest) {
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.RESEND_FROM_EMAIL;
+  const waitlistSegmentName = process.env.RESEND_WAITLIST_SEGMENT_NAME?.trim();
+  const waitlistTopicName = process.env.RESEND_WAITLIST_TOPIC_NAME?.trim();
 
-  if (!apiKey || !fromEmail) {
+  if (!apiKey || !fromEmail || !waitlistSegmentName || !waitlistTopicName) {
     return Response.json(
       {
         success: false,
-        error: "Email service is not configured.",
+        error:
+          "Email service is not fully configured. Missing required waitlist settings.",
       },
       { status: 500 },
     );

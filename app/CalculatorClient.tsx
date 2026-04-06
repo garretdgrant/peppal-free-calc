@@ -828,7 +828,7 @@ export default function CalculatorClient() {
                     </button>
                   ))}
                   {selectedDoseValue === "Other" ? (
-                    <div className="col-span-2 flex items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-2.5 py-2 sm:px-3 sm:py-2.5">
+                    <div className="flex items-center gap-2 rounded-xl border border-primary/50 bg-primary/5 px-2.5 py-2 sm:px-3 sm:py-2.5">
                       <input
                         type="number"
                         inputMode="decimal"

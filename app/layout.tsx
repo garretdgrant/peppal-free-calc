@@ -15,6 +15,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Free Reconstitution Calculator",
   description: "Pure peptide reconstitution calculator.",
+  openGraph: {
+    title: "Free Reconstitution Calculator",
+    description: "Pure peptide reconstitution calculator.",
+    images: [
+      {
+        url: "/free-calc-og.png",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
