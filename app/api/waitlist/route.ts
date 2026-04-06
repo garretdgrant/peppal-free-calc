@@ -249,7 +249,6 @@ let cachedWaitlistSegmentId =
 let waitlistSegmentIdPromise: Promise<string> | null = null;
 let cachedWaitlistTopicId =
   process.env.RESEND_WAITLIST_TOPIC_ID?.trim() ?? null;
-let waitlistTopicIdPromise: Promise<string> | null = null;
 
 const resolveCachedResendId = async ({
   cachedId,
@@ -339,41 +338,19 @@ const resolveWaitlistSegmentId = async (resend: Resend) => {
   });
 };
 
-const resolveWaitlistTopicId = async (resend: Resend) => {
-  return resolveCachedResendId({
-    cachedId: cachedWaitlistTopicId,
-    pendingPromise: waitlistTopicIdPromise,
-    load: async () => {
-      const configuredName = process.env.RESEND_WAITLIST_TOPIC_NAME?.trim();
+const resolveWaitlistTopicId = async () => {
+  if (cachedWaitlistTopicId) {
+    return cachedWaitlistTopicId;
+  }
 
-      if (!configuredName) {
-        throw new Error(
-          "RESEND_WAITLIST_TOPIC_NAME is required but not configured.",
-        );
-      }
+  const configuredId = process.env.RESEND_WAITLIST_TOPIC_ID?.trim();
 
-      const data = await callResend(
-        () => resend.topics.list(),
-        "Failed to list Resend topics",
-      );
+  if (!configuredId) {
+    throw new Error("RESEND_WAITLIST_TOPIC_ID is required but not configured.");
+  }
 
-      const topic = data.data.find(
-        (entry) =>
-          normalizeResendName(entry.name) ===
-          normalizeResendName(configuredName),
-      );
-
-      if (!topic) {
-        throw new Error(`Resend topic "${configuredName}" was not found.`);
-      }
-
-      return topic.id;
-    },
-    store: (value, promise) => {
-      cachedWaitlistTopicId = value;
-      waitlistTopicIdPromise = promise;
-    },
-  });
+  cachedWaitlistTopicId = configuredId;
+  return configuredId;
 };
 
 const ensureWaitlistSegmentMembership = async (
@@ -412,7 +389,7 @@ const ensureWaitlistSegmentMembership = async (
   }
 };
 
-const optInWaitlistTopic = async (
+const setOnlyWaitlistTopic = async (
   resend: Resend,
   email: string,
   topicId: string,
@@ -431,7 +408,6 @@ const createWaitlistContact = async (
   resend: Resend,
   email: string,
   segmentId: string,
-  topicId: string,
 ) => {
   await callResend(
     () =>
@@ -439,7 +415,6 @@ const createWaitlistContact = async (
         email,
         unsubscribed: false,
         segments: [{ id: segmentId }],
-        topics: [{ id: topicId, subscription: "opt_in" }],
       }),
     "Failed to create Resend contact",
   );
@@ -461,7 +436,7 @@ const syncExistingWaitlistContact = async (
   );
 
   await ensureWaitlistSegmentMembership(resend, email, segmentId);
-  await optInWaitlistTopic(resend, email, topicId);
+  await setOnlyWaitlistTopic(resend, email, topicId);
 };
 
 const ensureWaitlistContact = async (
@@ -471,7 +446,8 @@ const ensureWaitlistContact = async (
   topicId: string,
 ) => {
   try {
-    await createWaitlistContact(resend, email, segmentId, topicId);
+    await createWaitlistContact(resend, email, segmentId);
+    await setOnlyWaitlistTopic(resend, email, topicId);
   } catch (error) {
     if (!isAlreadyExistsError(error)) {
       throw error;
@@ -485,9 +461,15 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.RESEND_FROM_EMAIL;
   const waitlistSegmentName = process.env.RESEND_WAITLIST_SEGMENT_NAME?.trim();
-  const waitlistTopicName = process.env.RESEND_WAITLIST_TOPIC_NAME?.trim();
+  const waitlistSegmentId = process.env.RESEND_WAITLIST_SEGMENT_ID?.trim();
+  const waitlistTopicId = process.env.RESEND_WAITLIST_TOPIC_ID?.trim();
 
-  if (!apiKey || !fromEmail || !waitlistSegmentName || !waitlistTopicName) {
+  if (
+    !apiKey ||
+    !fromEmail ||
+    (!waitlistSegmentName && !waitlistSegmentId) ||
+    !waitlistTopicId
+  ) {
     return Response.json(
       {
         success: false,
@@ -528,7 +510,7 @@ export async function POST(req: NextRequest) {
     const resend = new Resend(apiKey);
     const [segmentId, topicId] = await Promise.all([
       resolveWaitlistSegmentId(resend),
-      resolveWaitlistTopicId(resend),
+      resolveWaitlistTopicId(),
     ]);
 
     await ensureWaitlistContact(resend, email, segmentId, topicId);
