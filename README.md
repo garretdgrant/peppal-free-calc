@@ -1,88 +1,85 @@
-# Free Peptide Calculator
+# Free Peptide Reconstitution Calculator
 
-Free Peptide Calculator is a focused peptide reconstitution calculator powered by [PepPal](https://peppal.app). It helps users convert vial size, bacteriostatic water volume, target dose, and syringe size into a U-100 insulin syringe draw in units.
+An open-source peptide reconstitution calculator built with Next.js, React, and TypeScript. Converts vial strength, bacteriostatic water volume, target dose, and syringe size into a U-100 insulin syringe draw expressed in units.
 
-The app is intentionally small: one calculator experience, a saved-calculation email flow, and enough documentation to keep future changes predictable.
+Live demo: [freepepcalc.com](https://www.freepepcalc.com)
+Full-featured hosted version: [peppal.app/calculator](https://www.peppal.app/calculator)
 
-## What It Does
+This repository is the source for the lightweight calculator at freepepcalc.com. It exists as a focused, open-source reference implementation of the same reconstitution math that powers [PepPal](https://www.peppal.app), where the hosted product also handles saved calculations, multi-peptide blend math, supplier reference data, and a full peptide library.
 
-- Calculates syringe units from vial strength, water volume, dose, and syringe capacity.
-- Supports common presets for Retatrutide, Tesamorelin, and BPC 157.
-- Accepts custom vial, water, and dose values.
-- Lets users reverse-calculate water volume from a desired syringe unit target.
-- Saves calculation summaries locally in the browser and sends the user an email copy through Resend.
-- Provides an internal email preview route for the saved-calculation email template.
+## What It Calculates
+
+Given a peptide vial, BAC water volume, and a target dose, the calculator returns:
+
+- **Concentration** — `mcg/mL = total peptide (mcg) ÷ water volume (mL)`
+- **Dose volume** — `mL = desired dose (mcg) ÷ concentration (mcg/mL)`
+- **Syringe units** — `U-100 units = dose volume (mL) × 100`
+
+It also supports reverse calculation: enter a target syringe unit draw and the calculator returns the BAC water volume that produces it. Built-in presets cover Retatrutide, Tesamorelin, and BPC-157 vial setups.
+
+For the formula derivations and worked examples, see [`docs/CALCULATOR_MATH.md`](./docs/CALCULATOR_MATH.md).
+
+## What This Repo Is Not
+
+This repo is the single-vial calculator. It does not handle:
+
+- Multi-peptide blend math (GLOW, KLOW, Wolverine, CJC/Ipamorelin combo vials) — for that, use the [peptide stack and blend calculator](https://www.peppal.app/tools/peptide-stack-calculator)
+- Saved calculation history with custom names and notes
+- Per-supplier vial size presets
+- Discount code lookup or supplier directory
+
+Those features live in the hosted PepPal product. If you want a richer experience or want to support the project, the [PepPal reconstitution calculator](https://www.peppal.app/calculator) is the canonical version.
 
 ## Tech Stack
 
-- Next.js 16 App Router
+- Next.js 16 (App Router)
 - React 19
 - TypeScript
 - Tailwind CSS 4
-- Resend for contact, segment, topic, and email delivery
-- ESLint and Prettier
+- Resend (transactional email for the optional "save calculation" flow)
+- ESLint + Prettier
 
 ## Getting Started
 
-Install dependencies:
-
 ```bash
 pnpm install
-```
-
-Run the development server:
-
-```bash
 pnpm dev
 ```
 
 Open `http://localhost:3000`.
 
-Build for production:
+Production build:
 
 ```bash
 pnpm build
-```
-
-Start the production build:
-
-```bash
 pnpm start
 ```
 
-Run linting:
+Lint and format:
 
 ```bash
 pnpm lint
-```
-
-Format the project:
-
-```bash
 pnpm prettier
 ```
 
-## Environment Variables
+The calculator UI runs without environment variables. The optional save/email flow requires Resend credentials — see [`docs/environment.md`](./docs/environment.md).
 
-The calculator UI runs without environment variables, but the save/email flow requires Resend settings:
+## Where The Math Comes From
 
-```bash
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=
-RESEND_WAITLIST_SEGMENT_NAME=
-RESEND_WAITLIST_SEGMENT_ID=
-RESEND_WAITLIST_TOPIC_ID=
-```
+Every formula in this calculator is the standard reconstitution math used in clinical pharmacy and the peptide research community. There is nothing proprietary about the arithmetic — concentration is total peptide divided by water volume, and dose volume is desired dose divided by concentration. The value of a calculator is consistent unit handling (mg vs mcg, mL vs U-100 units) and not making the user do the conversions by hand.
 
-`RESEND_WAITLIST_SEGMENT_NAME` or `RESEND_WAITLIST_SEGMENT_ID` must be configured. The route uses the ID directly when present and otherwise looks up the segment by name.
+For the dosing context behind these calculations on specific peptides, see the dosing protocol references on Peptide Dosing Protocols. A few that pair well with reconstitution math:
 
-Keep `.env` files local. Do not commit secrets.
+- [BPC-157 protocol](https://www.peptidedosingprotocols.com/protocol/bpc-157) — standard 5 mg and 10 mg vial setups, common 250–500 mcg daily dosing
+- [TB-500 protocol](https://www.peptidedosingprotocols.com/protocol/tb-500) — 10 mg vial setups with loading and maintenance dose math, plus the 1–2 week reconstituted stability window that drives water-volume choice
+- [Tirzepatide protocol](https://www.peptidedosingprotocols.com/protocol/tirzepatide) — 10 mg, 30 mg, and 60 mg vials with titration math from 2.5 mg to 15 mg weekly
+- [Retatrutide protocol](https://www.peptidedosingprotocols.com/protocol/retatrutide) — 10 mg and 24 mg vials with titration math up to 12 mg weekly
 
-See [Environment Setup](docs/environment.md) for more detail.
+Each protocol page includes the full clinical dosing schedule that the reconstitution math operates against.
 
 ## Project Structure
 
-```text
+```
 app/
   api/
     email-preview/free-calc/route.ts
@@ -91,38 +88,45 @@ app/
   globals.css
   layout.tsx
   page.tsx
+docs/
+  CALCULATOR_MATH.md
+  api-and-email.md
+  architecture.md
+  calculator-behavior.md
+  environment.md
+  maintenance.md
 lib/
   emails/freeCalcWelcomeEmail.ts
   spam.ts
   validations.ts
 public/
   free-calc-og.png
-docs/
 ```
 
-Key files:
-
-- `app/page.tsx` renders the server page shell.
-- `app/CalculatorClient.tsx` owns calculator state, presets, formulas, modal behavior, localStorage, and the client-side call to `/api/waitlist`.
-- `app/api/waitlist/route.ts` validates submissions, handles the honeypot field, syncs the Resend contact, opts the contact into the configured topic, and sends the saved-calculation email.
-- `lib/emails/freeCalcWelcomeEmail.ts` renders the transactional-style saved calculation email.
-- `app/api/email-preview/free-calc/route.ts` renders a browser preview of the saved-calculation email.
+Key files: `app/CalculatorClient.tsx` owns calculator state, formulas, presets, and the optional save-calculation flow. `lib/emails/freeCalcWelcomeEmail.ts` renders the saved-calculation email. `app/api/waitlist/route.ts` handles validation and Resend sync.
 
 ## Documentation
 
-- [Environment Setup](docs/environment.md)
-- [Architecture](docs/architecture.md)
-- [Calculator Behavior](docs/calculator-behavior.md)
-- [API and Email Flow](docs/api-and-email.md)
-- [Project Maintenance](docs/maintenance.md)
-- [Contributing](CONTRIBUTING.md)
+- [Calculator Math](./docs/CALCULATOR_MATH.md) — formulas, unit conventions, and worked examples for BPC-157, TB-500, tirzepatide, and retatrutide
+- [Environment Setup](./docs/environment.md)
+- [Architecture](./docs/architecture.md)
+- [Calculator Behavior](./docs/calculator-behavior.md)
+- [API and Email Flow](./docs/api-and-email.md)
+- [Project Maintenance](./docs/maintenance.md)
+- [Contributing](./CONTRIBUTING.md)
 
-## Product Notes
+## Contributing
 
-This project is an educational calculator. It should avoid medical claims, treatment recommendations, or dosing instructions beyond arithmetic outputs from user-provided inputs.
+Pull requests for math corrections, additional vial-size presets, accessibility improvements, and bug fixes are welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the contribution workflow and editorial standards.
 
-When changing copy, keep the calculator framed as a calculation aid. Do not imply that a peptide, dose, route, schedule, or protocol is safe or appropriate for a person.
+## Use Notes
 
-## Deployment
+This is an educational calculator. It does the arithmetic — it does not recommend doses, validate that any peptide is appropriate for a person, or provide medical guidance. All copy in the app is intentionally framed as calculation output from user-provided inputs. Keep PRs aligned with that framing; the project does not accept changes that imply a peptide, dose, route, schedule, or protocol is safe or appropriate for any individual.
 
-The app is compatible with Vercel and standard Next.js hosting that supports App Router route handlers. Production deployments need the same Resend environment variables used locally for the save/email flow.
+## License
+
+MIT.
+
+## Credits
+
+Built and maintained by Garret Grant. Companion projects: [PepPal](https://www.peppal.app) (calculator suite, supplier directory, peptide blog) and [Peptide Dosing Protocols](https://www.peptidedosingprotocols.com) (open dosing protocol database).

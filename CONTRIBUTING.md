@@ -1,99 +1,37 @@
 # Contributing
 
-This project is a small Next.js app, so contributions should stay focused and easy to verify. Prefer direct improvements over broad rewrites.
+Thanks for considering a contribution. This project is small on purpose — a single-vial peptide reconstitution calculator with a save-calculation email flow. The goal is to keep the math correct, the UI fast, and the framing strictly educational.
 
-## Local Setup
+## What We Accept
 
-Install dependencies:
+- Math corrections and additional unit-tested edge cases
+- New vial-size presets for peptides where the math is well-documented in primary sources
+- Accessibility fixes (keyboard navigation, screen reader labels, color contrast)
+- Bug fixes (UI, validation, edge-case rounding, mobile layout)
+- Documentation improvements in `docs/`
+- Performance improvements (bundle size, hydration, render path)
 
-```bash
-pnpm install
-```
+## What We Don't Accept
 
-Run locally:
+- Copy changes that imply a peptide, dose, schedule, route, or protocol is safe or appropriate for a person
+- Medical recommendations, treatment language, or marketing claims
+- Affiliate links or supplier promotion (the live PepPal product handles supplier reference data)
+- New features that duplicate the hosted [PepPal calculator suite](https://www.peppal.app/calculator) — this repo is the lightweight reference implementation, not a competing fork
 
-```bash
-pnpm dev
-```
+For multi-peptide blend math (Wolverine, GLOW, KLOW, CJC/Ipamorelin combo vials), point users to the [stack and blend calculator on PepPal](https://www.peppal.app/tools/peptide-stack-calculator) rather than adding blend support here.
 
-Before opening or merging a change, run:
+## Workflow
 
-```bash
-pnpm lint
-pnpm build
-```
+1. Open an issue describing the problem or change before opening a PR for anything beyond a typo or a one-line fix.
+2. Fork, branch from `main`, and keep the diff focused on one change.
+3. Run `pnpm lint` and `pnpm prettier` before pushing.
+4. Add or update tests where math behavior changes.
+5. In the PR description, link any sources you used to verify peptide-specific values (PubMed, manufacturer prescribing information, peer-reviewed reviews).
 
-Use Prettier for formatting:
+## Methodology Reference
 
-```bash
-pnpm prettier
-```
+For the editorial standards and source-tier system that guide what counts as a verifiable claim across this ecosystem, see the [PepPal methodology page](https://www.peppal.app/about). The same Tier 1–4 source hierarchy applies to anything you cite in a PR for peptide-specific values.
 
-## Branch Workflow
+## Code of Conduct
 
-1. Create a branch for the change.
-2. Keep commits scoped to one user-facing or technical purpose.
-3. Update documentation when behavior, setup, environment variables, or maintainer workflow changes.
-4. Run lint and build before handing off.
-
-## Code Standards
-
-- Follow the existing App Router structure.
-- Keep interactive state inside client components. The current calculator entry point is `app/CalculatorClient.tsx`.
-- Keep server-only integrations in route handlers or server-side helpers.
-- Never expose Resend secrets or other private values to the browser.
-- Prefer clear validation and explicit error responses for API routes.
-- Keep UI copy concise and calculation-focused.
-
-## Next.js Version Note
-
-This project uses Next.js 16. Before changing Next.js APIs, routing conventions, metadata, route handlers, or configuration, read the matching local guide in `node_modules/next/dist/docs/`.
-
-Useful local docs for this app:
-
-- `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md`
-- `node_modules/next/dist/docs/01-app/02-guides/environment-variables.md`
-- `node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-client.md`
-- `node_modules/next/dist/docs/01-app/01-getting-started/14-metadata-and-og-images.md`
-
-## Calculator Changes
-
-Calculator changes should preserve the core U-100 convention:
-
-- `100 units = 1 mL`
-- `doseVolumeMl = doseMcg / concentrationMcgPerMl`
-- `units = doseVolumeMl * 100`
-
-When changing formula behavior, update [Calculator Behavior](docs/calculator-behavior.md) and manually test normal, tiny, invalid, and syringe-overflow states.
-
-## Email and Waitlist Changes
-
-The save flow posts to `/api/waitlist`, stores a local browser copy, and sends an email summary through Resend.
-
-When changing this flow:
-
-- Test invalid email submissions.
-- Test honeypot submissions.
-- Test missing environment variable behavior.
-- Preview the email at `/api/email-preview/free-calc`.
-- Keep unsubscribe support in the email template.
-
-## Copy and Compliance
-
-Free Peptide Calculator is powered by [PepPal](https://peppal.app), but this repo should not create medical advice. Avoid:
-
-- Treatment recommendations.
-- Claims that a peptide or dose is safe or effective.
-- Protocol instructions.
-- User-specific medical guidance.
-
-Acceptable copy describes arithmetic, calculator inputs, saved calculations, and product status.
-
-## Pull Request Checklist
-
-- Lint passes.
-- Production build passes.
-- Relevant docs are updated.
-- Environment variables are documented when changed.
-- UI changes have been checked on mobile and desktop widths.
-- Email changes have been checked through the preview route.
+Be direct, technical, and respectful. Disagree with code, not with people. Maintainers reserve the right to close PRs that don't align with the project's educational-only framing.
